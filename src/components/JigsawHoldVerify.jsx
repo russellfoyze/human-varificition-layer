@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { soundEffects } from '../utils/soundEffects.js';
 
 /**
  * Helper: Draws a classic interlocking Jigsaw Piece path on HTML5 Canvas
@@ -28,7 +29,13 @@ function drawJigsawPath(ctx, x, y, size, tabSize = 11) {
   ctx.closePath();
 }
 
-export default function JigsawHoldVerify({ onVerified, onAttempt }) {
+export default function JigsawHoldVerify({
+  onVerified,
+  onAttempt,
+  streak = 0,
+  soundEnabled = true,
+  lastReward = null,
+}) {
   // States: IDLE | DRAGGING | HOLDING_SLOT | READY_RELEASE | VERIFIED | FAILED
   const [phase, setPhase] = useState('IDLE');
   const [failReason, setFailReason] = useState('');
@@ -39,6 +46,10 @@ export default function JigsawHoldVerify({ onVerified, onAttempt }) {
   const phaseRef = useRef('IDLE');
   const handleRef = useRef(null);
   const progressFillRef = useRef(null);
+
+  useEffect(() => {
+    soundEffects.enabled = soundEnabled;
+  }, [soundEnabled]);
 
   // Puzzle geometry & closed-loop physics refs
   const puzzleRef = useRef({
@@ -149,6 +160,7 @@ export default function JigsawHoldVerify({ onVerified, onAttempt }) {
           setHoldProgress(0);
         } else if (now >= p.releaseCueTime) {
           setHoldProgress(100);
+          soundEffects.playGreenAlert();
           setPhaseSync('READY_RELEASE');
         }
       }
@@ -156,6 +168,7 @@ export default function JigsawHoldVerify({ onVerified, onAttempt }) {
       // Timeout check in READY_RELEASE (> 680ms after turning emerald green)
       if (mode === 'READY_RELEASE' && now - p.releaseCueTime > 680) {
         setFailReason('Release timeout (>680ms). Wait for the green flash and release immediately!');
+        soundEffects.playFail();
         setPhaseSync('FAILED');
       }
 
@@ -292,6 +305,7 @@ export default function JigsawHoldVerify({ onVerified, onAttempt }) {
       // Randomize magnetic hold duration between 850ms and 1250ms
       p.releaseCueTime = now + 850 + Math.random() * 400;
       p.magneticDriftX = 0;
+      soundEffects.playMagneticHum();
       setPhaseSync('HOLDING_SLOT');
     }
   };
@@ -309,6 +323,7 @@ export default function JigsawHoldVerify({ onVerified, onAttempt }) {
     if (mode === 'DRAGGING') {
       const reason = `Jigsaw piece not locked! Stopped ${Math.round(finalDist)}px away from cutout. Slide into the slot and HOLD.`;
       setFailReason(reason);
+      soundEffects.playFail();
       setPhaseSync('FAILED');
       if (onAttempt) {
         onAttempt({
@@ -329,6 +344,7 @@ export default function JigsawHoldVerify({ onVerified, onAttempt }) {
       const earlyMs = Math.round(p.releaseCueTime - now);
       const reason = `Released ${earlyMs}ms too early! Keep holding inside the jigsaw slot until it flashes GREEN.`;
       setFailReason(reason);
+      soundEffects.playFail();
       setPhaseSync('FAILED');
       if (onAttempt) {
         onAttempt({
@@ -352,6 +368,7 @@ export default function JigsawHoldVerify({ onVerified, onAttempt }) {
       if (reactionMs < 115) {
         const reason = `Bot Blocked: ${reactionMs}ms release is faster than human optic-motor latency (115ms min).`;
         setFailReason(reason);
+        soundEffects.playFail();
         setPhaseSync('FAILED');
         if (onAttempt) {
           onAttempt({
@@ -416,6 +433,7 @@ export default function JigsawHoldVerify({ onVerified, onAttempt }) {
         setFailReason(
           'AI Trajectory Generator Blocked! Failed C/D Gain shift & lacked ballistic sub-movement intermittency + off-axis wrist coupling.'
         );
+        soundEffects.playFail();
         setPhaseSync('FAILED');
         if (onVerified) onVerified(botTelemetry);
         if (onAttempt) onAttempt(botTelemetry);
@@ -440,6 +458,7 @@ export default function JigsawHoldVerify({ onVerified, onAttempt }) {
         verified: true,
       };
       setTelemetry(successTelemetry);
+      soundEffects.playSuccess(streak + 1);
       setPhaseSync('VERIFIED');
       if (onVerified) onVerified(successTelemetry);
       if (onAttempt) onAttempt(successTelemetry);
@@ -574,42 +593,104 @@ export default function JigsawHoldVerify({ onVerified, onAttempt }) {
         </div>
       </div>
 
-      {/* Failure Alert */}
+      {/* Failure Alert & Retry CTA */}
       {failReason && (
-        <div className="mt-3 p-2.5 rounded-xl bg-rose-950/70 border border-rose-800 text-rose-200 text-xs">
-          🛡️ {failReason}
+        <div className="mt-3 p-3 rounded-2xl bg-gradient-to-b from-rose-950/80 to-slate-900 border border-rose-800/80 text-rose-200 text-xs shadow-xl space-y-2 animate-in fade-in duration-150">
+          <div className="flex items-start gap-2">
+            <span className="text-base shrink-0">🛡️</span>
+            <div>
+              <div className="font-bold text-rose-300">Verification Interrupted</div>
+              <p className="text-[11px] text-rose-200/90 mt-0.5 leading-relaxed">{failReason}</p>
+            </div>
+          </div>
+          <div className="bg-slate-950/60 p-2 rounded-xl text-[10px] text-slate-400 border border-slate-800/60 flex items-center justify-between">
+            <span>💡 Pro Tip: Hold inside the slot until green flash, then release swiftly!</span>
+            <button
+              onClick={initChallenge}
+              className="px-2.5 py-1 bg-rose-900 hover:bg-rose-800 text-rose-100 rounded-lg font-bold text-[10px] transition shrink-0 ml-2"
+            >
+              🔄 Retry Round
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Telemetry Readout on Success */}
-      {telemetry && (
-        <div className="mt-3 p-3 rounded-xl bg-emerald-950/40 border border-emerald-800 text-xs">
-          <div className="font-bold text-emerald-400 mb-2">
-            ✓ JIGSAW + MAGNETIC HOLD VERIFIED
-          </div>
-          <div className="grid grid-cols-4 gap-1.5 text-center">
-            <div className="bg-slate-900 p-1.5 rounded border border-slate-800">
-              <div className="text-[10px] text-slate-400">Slot Fit</div>
-              <div className="font-mono font-bold text-white">{telemetry.alignErrorPx}</div>
+      {/* Telemetry Readout & Reward Victory Card on Success */}
+      {telemetry && telemetry.verified && (
+        <div className="mt-3 p-4 rounded-2xl bg-gradient-to-b from-slate-900/95 via-emerald-950/40 to-slate-900/95 border border-emerald-500/50 text-xs shadow-2xl relative overflow-hidden backdrop-blur-md animate-in fade-in zoom-in-95 duration-200">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+
+          {/* Victory Header & XP Pill */}
+          <div className="flex items-center justify-between mb-3 relative z-10">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🏆</span>
+              <div>
+                <div className="font-extrabold text-emerald-300 text-sm tracking-wide flex items-center gap-1.5">
+                  HUMAN VERIFIED!
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-900/80 text-emerald-200 border border-emerald-700/60">
+                    PASS
+                  </span>
+                </div>
+                <div className="text-[11px] text-emerald-400/80">Closed-Loop Neuro-Reflex Validated</div>
+              </div>
             </div>
-            <div className="bg-slate-900 p-1.5 rounded border border-slate-800">
-              <div className="text-[10px] text-slate-400">Release Lag</div>
+            {lastReward && (
+              <div className="bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 font-black text-xs px-3 py-1.5 rounded-full shadow-lg shadow-emerald-500/30 flex items-center gap-1 animate-pulse">
+                +{lastReward.earnedXP} XP
+              </div>
+            )}
+          </div>
+
+          {/* Performance Scoring Grades */}
+          {lastReward && (
+            <div className="grid grid-cols-3 gap-2 mb-3 relative z-10">
+              <div className="bg-slate-950/70 border border-slate-800/90 rounded-xl p-2 text-center">
+                <div className="text-[10px] text-slate-400 font-semibold uppercase">Reflex Speed</div>
+                <div className="font-bold text-emerald-300 text-xs mt-0.5">{lastReward.reflexGrade}</div>
+                <div className="text-[10px] text-slate-400 font-mono">{telemetry.releaseLagMs}</div>
+              </div>
+              <div className="bg-slate-950/70 border border-slate-800/90 rounded-xl p-2 text-center">
+                <div className="text-[10px] text-slate-400 font-semibold uppercase">Slot Precision</div>
+                <div className="font-bold text-cyan-300 text-xs mt-0.5">{lastReward.fitGrade}</div>
+                <div className="text-[10px] text-slate-400 font-mono">{telemetry.alignErrorPx}</div>
+              </div>
+              <div className="bg-slate-950/70 border border-slate-800/90 rounded-xl p-2 text-center">
+                <div className="text-[10px] text-slate-400 font-semibold uppercase">Combo Multiplier</div>
+                <div className="font-bold text-amber-300 text-xs mt-0.5">🔥 {lastReward.streakMult}x</div>
+                <div className="text-[10px] text-slate-400">Streak: {streak}</div>
+              </div>
+            </div>
+          )}
+
+          {/* Biomechanical Invariants Matrix */}
+          <div className="grid grid-cols-4 gap-1.5 text-center mb-3 relative z-10">
+            <div className="bg-slate-950/80 p-1.5 rounded-lg border border-slate-800">
+              <div className="text-[9px] text-slate-400">Slot Fit</div>
+              <div className="font-mono font-bold text-slate-200">{telemetry.alignErrorPx}</div>
+            </div>
+            <div className="bg-slate-950/80 p-1.5 rounded-lg border border-slate-800">
+              <div className="text-[9px] text-slate-400">Release Lag</div>
               <div className="font-mono font-bold text-emerald-400">{telemetry.releaseLagMs}</div>
             </div>
-            <div className="bg-slate-900 p-1.5 rounded border border-slate-800">
-              <div className="text-[10px] text-slate-400">Ballistics</div>
+            <div className="bg-slate-950/80 p-1.5 rounded-lg border border-slate-800">
+              <div className="text-[9px] text-slate-400">Craik Pulses</div>
               <div className="font-mono font-bold text-cyan-400">{telemetry.ballisticPeaks}</div>
             </div>
-            <div className="bg-slate-900 p-1.5 rounded border border-slate-800">
-              <div className="text-[10px] text-slate-400">Wrist Arc</div>
+            <div className="bg-slate-950/80 p-1.5 rounded-lg border border-slate-800">
+              <div className="text-[9px] text-slate-400">Wrist Arc</div>
               <div className="font-mono font-bold text-indigo-300">{telemetry.wristCoupling}</div>
             </div>
           </div>
+
+          {/* Next Round Button */}
           <button
             onClick={initChallenge}
-            className="w-full mt-2.5 py-2 bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-500 hover:from-emerald-500 hover:to-teal-400 text-slate-950 font-bold rounded-xl text-xs shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.99]"
+            className="w-full py-2.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 hover:from-emerald-400 hover:to-cyan-300 text-slate-950 font-black rounded-xl text-xs shadow-lg shadow-emerald-500/25 transition flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] transform group relative z-10"
           >
-            🎮 Next Puzzle Round →
+            <span>🎮 Next Puzzle Round</span>
+            <span className="font-mono bg-slate-950/20 px-2 py-0.5 rounded text-[10px] font-bold">
+              Keep {streak}x Streak Alive →
+            </span>
           </button>
         </div>
       )}
