@@ -35,6 +35,8 @@ export default function JigsawHoldVerify({
   streak = 0,
   soundEnabled = true,
   lastReward = null,
+  isGateMode = false,
+  onUnlockApp = null,
 }) {
   // States: IDLE | DRAGGING | HOLDING_SLOT | READY_RELEASE | VERIFIED | FAILED
   const [phase, setPhase] = useState('IDLE');
@@ -816,16 +818,25 @@ export default function JigsawHoldVerify({
             </div>
           </div>
 
-          {/* Next Round Button */}
-          <button
-            onClick={initChallenge}
-            className="w-full py-2.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 hover:from-emerald-400 hover:to-cyan-300 text-slate-950 font-black rounded-xl text-xs shadow-lg shadow-emerald-500/25 transition flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] transform group relative z-10"
-          >
-            <span>🎮 Next Puzzle Round</span>
-            <span className="font-mono bg-slate-950/20 px-2 py-0.5 rounded text-[10px] font-bold">
-              Keep {streak}x Streak Alive →
-            </span>
-          </button>
+          {/* Next Round / Unlock Main App Button */}
+          {isGateMode && onUnlockApp ? (
+            <button
+              onClick={onUnlockApp}
+              className="w-full py-3 bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 hover:from-emerald-300 hover:to-cyan-200 text-slate-950 font-black rounded-xl text-xs shadow-xl shadow-emerald-500/35 transition flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] transform group relative z-10 animate-bounce"
+            >
+              <span>🔓 Access Granted — Enter Main App Now →</span>
+            </button>
+          ) : (
+            <button
+              onClick={initChallenge}
+              className="w-full py-2.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 hover:from-emerald-400 hover:to-cyan-300 text-slate-950 font-black rounded-xl text-xs shadow-lg shadow-emerald-500/25 transition flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] transform group relative z-10"
+            >
+              <span>🎮 Next Puzzle Round</span>
+              <span className="font-mono bg-slate-950/20 px-2 py-0.5 rounded text-[10px] font-bold">
+                Keep {streak}x Streak Alive →
+              </span>
+            </button>
+          )}
         </div>
       )}
 

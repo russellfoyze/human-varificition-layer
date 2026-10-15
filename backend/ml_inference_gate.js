@@ -19,7 +19,7 @@ export function scoreLiveTelemetryWithML(telemetry) {
   if (telemetry.reactionMs < 115 || telemetry.reactionMs > 680) {
     return { verified: false, mlScore: 0.0, reason: 'Failed Algorithm 4: Optic-Nerve / VLM Latency Bound' };
   }
-  if (telemetry.submovementRateHz < 1.8 || telemetry.submovementRateHz > 14.5 || telemetry.ballisticPeaks < 3) {
+  if (telemetry.submovementRateHz < 1.2 || telemetry.submovementRateHz > 28.0 || telemetry.ballisticPeaks < 3) {
     return { verified: false, mlScore: 0.0, reason: 'Failed Algorithm 2: Craik Ballistic Submovement Bound' };
   }
   if (telemetry.wristCoupling < 0.035) {
