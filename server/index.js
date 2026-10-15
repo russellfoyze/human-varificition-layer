@@ -3,6 +3,7 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { spawn } from 'child_process';
 import { WebSocketServer } from 'ws';
 import { signVerificationToken, verifyVerificationToken, HMAC_SECRET } from './cryptoToken.js';
 import { verifyClosedLoopBiomechanics } from './closedLoopScorer.js';
@@ -140,6 +141,40 @@ app.get('/api/ml-audit/metrics', (req, res) => {
     }
   }
   return res.status(404).json({ error: 'Audit metrics not yet generated' });
+});
+
+// Train ML Model directly on live Dataset Hub telemetry
+app.post('/api/ml/train', (req, res) => {
+  const py = spawn('python', ['train_model.py'], {
+    cwd: path.join(__dirname, '..'),
+  });
+
+  let output = '';
+  let errOutput = '';
+
+  py.stdout.on('data', (d) => {
+    output += d.toString();
+  });
+
+  py.stderr.on('data', (d) => {
+    errOutput += d.toString();
+  });
+
+  py.on('close', (code) => {
+    if (code === 0) {
+      return res.json({
+        success: true,
+        message: 'Trained Random Forest model on live Dataset Hub telemetry',
+        output,
+      });
+    } else {
+      return res.status(500).json({
+        success: false,
+        error: errOutput || 'Python process returned non-zero exit code',
+        output,
+      });
+    }
+  });
 });
 
 const server = http.createServer(app);

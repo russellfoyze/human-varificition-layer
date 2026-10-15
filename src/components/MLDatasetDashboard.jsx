@@ -4,6 +4,8 @@ export default function MLDatasetDashboard({ dataset = [], stats = {}, onClear, 
   const [filter, setFilter] = useState('ALL'); // ALL | HUMAN | BOT | PASSED | FAILED
   const [copiedCode, setCopiedCode] = useState(false);
   const [auditMetrics, setAuditMetrics] = useState(null);
+  const [trainingState, setTrainingState] = useState('IDLE'); // IDLE | TRAINING | SUCCESS | ERROR
+  const [trainOutput, setTrainOutput] = useState(null);
 
   useEffect(() => {
     fetch('http://localhost:4000/api/ml-audit/metrics')
@@ -13,6 +15,26 @@ export default function MLDatasetDashboard({ dataset = [], stats = {}, onClear, 
       })
       .catch(() => {});
   }, []);
+
+  const handleTrainOnHubData = async () => {
+    setTrainingState('TRAINING');
+    setTrainOutput(null);
+    try {
+      const res = await fetch('http://localhost:4000/api/ml/train', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setTrainingState('SUCCESS');
+        setTrainOutput(data.output);
+        if (onRefresh) onRefresh();
+      } else {
+        setTrainingState('ERROR');
+        setTrainOutput(data.error || 'Failed to train model');
+      }
+    } catch (err) {
+      setTrainingState('ERROR');
+      setTrainOutput('Failed to connect to backend server');
+    }
+  };
 
   const filteredData = dataset.filter((item) => {
     if (filter === 'HUMAN') return item.is_bot === 0;
@@ -97,6 +119,18 @@ print(classification_report(y_test, preds, target_names=['Human', 'Bot']))
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2">
           <button
+            onClick={handleTrainOnHubData}
+            disabled={trainingState === 'TRAINING'}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 shadow-md cursor-pointer active:scale-95 ${
+              trainingState === 'TRAINING'
+                ? 'bg-amber-900/60 text-amber-200 border border-amber-600 animate-pulse'
+                : 'bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 hover:from-emerald-400 hover:to-cyan-300 text-slate-950 shadow-emerald-500/20'
+            }`}
+          >
+            <span>{trainingState === 'TRAINING' ? '⏳' : '⚡'}</span>
+            <span>{trainingState === 'TRAINING' ? 'Training Model...' : 'Train Model on Hub Data'}</span>
+          </button>
+          <button
             onClick={downloadCSV}
             className="px-3 py-1.5 bg-emerald-950 hover:bg-emerald-900 border border-emerald-700/60 rounded-xl text-xs text-emerald-300 font-semibold transition flex items-center gap-1.5"
           >
@@ -116,6 +150,34 @@ print(classification_report(y_test, preds, target_names=['Human', 'Bot']))
           </button>
         </div>
       </div>
+
+      {/* Live Training Feedback Banner */}
+      {trainOutput && (
+        <div
+          className={`p-3 rounded-2xl border text-xs font-mono space-y-1.5 ${
+            trainingState === 'SUCCESS'
+              ? 'bg-emerald-950/50 border-emerald-500/60 text-emerald-200'
+              : 'bg-rose-950/50 border-rose-800 text-rose-200'
+          }`}
+        >
+          <div className="flex items-center justify-between font-bold text-[11px]">
+            <span>
+              {trainingState === 'SUCCESS'
+                ? '✓ Random Forest Classifier Trained & Deployed to Live Inference Gate'
+                : '✗ Model Training Interrupted'}
+            </span>
+            <button
+              onClick={() => setTrainOutput(null)}
+              className="text-slate-400 hover:text-white cursor-pointer px-1 text-sm"
+            >
+              ✕
+            </button>
+          </div>
+          <pre className="text-[10px] text-slate-300 max-h-48 overflow-y-auto whitespace-pre-wrap bg-slate-950/80 p-2.5 rounded-xl border border-slate-800/80">
+            {trainOutput}
+          </pre>
+        </div>
+      )}
 
       {/* Aggregate KPI Stat Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2.5">

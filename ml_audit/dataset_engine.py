@@ -1,9 +1,12 @@
 import os
+import sys
 import json
 import uuid
 import numpy as np
 import pandas as pd
 from datetime import datetime, timezone
+
+sys.path.insert(0, os.path.dirname(__file__))
 from feature_extractor import extract_features_from_sample, FEATURE_NAMES
 
 DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "ml_dataset.json")
