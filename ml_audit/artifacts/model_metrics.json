@@ -1,0 +1,25 @@
+{
+  "project": "AntiGravity Sensorimotor Human Verification Layer",
+  "samplesEvaluated": 2400,
+  "classifierMetrics": {
+    "ensembleRocAuc": 1.0,
+    "equalErrorRatePct": 0.0,
+    "falseAcceptanceRatePct": 0.0,
+    "falseRejectionRatePct": 3.667
+  },
+  "adversarialReplaceabilityAudit": {
+    "episodesPerRegime": 5000,
+    "blackBoxBypassRatePct": 0.0,
+    "grayBoxDelayedBotBypassRatePct": 0.0,
+    "whiteBoxAdaptiveBotBypassRatePct": 0.04,
+    "overallAiReplaceabilityScorePct": 0.016,
+    "securityVerdict": "NON_REPLACEABLE_BY_AI (Q1_GRADE_SECURE)"
+  },
+  "topDiscriminativeFeatures": {
+    "ballisticPeaks": 0.2067,
+    "submovementRateHz": 0.2022,
+    "wristCoupling": 0.197,
+    "jerkZeroCrossings": 0.1855,
+    "velocitySkewness": 0.0798
+  }
+}

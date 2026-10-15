@@ -1,8 +1,12 @@
 import express from 'express';
 import http from 'http';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
 import { signVerificationToken, verifyVerificationToken, HMAC_SECRET } from './cryptoToken.js';
 import { verifyClosedLoopBiomechanics } from './closedLoopScorer.js';
+import { scoreLiveTelemetryWithML } from './ml_inference_gate.js';
 import {
   recordSample,
   getDataset,
@@ -10,6 +14,9 @@ import {
   exportToCSV,
   clearDataset,
 } from './datasetStore.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json());
@@ -109,6 +116,30 @@ app.get('/api/telemetry/export-csv', (req, res) => {
 app.delete('/api/telemetry/clear', (req, res) => {
   clearDataset();
   return res.json({ success: true, message: 'Dataset cleared' });
+});
+
+// Score telemetry with Deterministic Algorithms + Trained ML Mahalanobis Ensemble
+app.post('/api/telemetry/score-ml', (req, res) => {
+  const telemetry = req.body;
+  if (!telemetry) {
+    return res.status(400).json({ error: 'Telemetry data required' });
+  }
+  const scoreResult = scoreLiveTelemetryWithML(telemetry);
+  return res.json(scoreResult);
+});
+
+// Get Adversarial AI-Replaceability Audit Report
+app.get('/api/ml-audit/metrics', (req, res) => {
+  const metricsPath = path.join(__dirname, '..', 'ml_audit', 'artifacts', 'model_metrics.json');
+  if (fs.existsSync(metricsPath)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(metricsPath, 'utf-8'));
+      return res.json(data);
+    } catch (e) {
+      return res.status(500).json({ error: 'Failed to read audit metrics' });
+    }
+  }
+  return res.status(404).json({ error: 'Audit metrics not yet generated' });
 });
 
 const server = http.createServer(app);
