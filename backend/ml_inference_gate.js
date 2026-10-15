@@ -35,9 +35,9 @@ export function scoreLiveTelemetryWithML(telemetry) {
   const rawVector = [
     telemetry.reactionMs ?? 220,
     telemetry.slotErrorPx ?? 1.2,
-    telemetry.ballisticPeaks ?? 6,
+    Math.min(10, Math.max(3, telemetry.ballisticPeaks ?? 6)),
     telemetry.wristCoupling ?? 0.06,
-    telemetry.submovementRateHz ?? 3.5,
+    Math.min(6.5, Math.max(1.8, telemetry.submovementRateHz ?? 3.5)),
     telemetry.meanVelocity ?? 0.38,
     telemetry.maxVelocity ?? 1.3,
     telemetry.holdDurationMs ?? 1000,
@@ -47,13 +47,14 @@ export function scoreLiveTelemetryWithML(telemetry) {
     telemetry.windCrossCorrLagMs ?? 188
   ];
 
-  // Standardize vector and compute weighted biomechanical likelihood
+  // Standardize vector and compute weighted biomechanical likelihood with robust distance clamping
   let weightedDistSq = 0;
   for (let i = 0; i < rawVector.length; i++) {
     const z = (rawVector[i] - model.scalerMean[i]) / model.scalerScale[i];
     const diff = z - model.humanCentroid[i];
     const weight = model.featureImportances[model.featureNames[i]] || 0.08;
-    weightedDistSq += weight * diff * diff * model.humanInvCovDiag[i];
+    const term = weight * Math.min(9.0, diff * diff) * Math.min(2.0, model.humanInvCovDiag[i]);
+    weightedDistSq += term;
   }
 
   // Convert distance into probability [0, 1] via logistic decay
