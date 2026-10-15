@@ -505,6 +505,99 @@ export default function JigsawHoldVerify({
     }, 16);
   };
 
+  // Red-Team Simulator: Runs an adaptive AI bot evaluated against the Trained ML Model
+  const runTrainedMLBot = () => {
+    initChallenge();
+    const p = puzzleRef.current;
+    p.isBotSim = true;
+    p.pointerLog = [{ x: 18, y: 80, t: performance.now() }];
+    setPhaseSync('DRAGGING');
+
+    // Adaptive bot compensates for the C/D gain shift to reach the slot
+    let step = 0;
+    const targetSliderX = (p.targetX - p.cdGainShiftX) / 0.88 + p.cdGainShiftX;
+
+    const botInterval = setInterval(async () => {
+      step++;
+      const progress = Math.min(1, step / 30);
+      p.rawSliderX = 18 + (targetSliderX - 18) * progress;
+
+      if (p.rawSliderX > p.cdGainShiftX) {
+        p.currentX = p.cdGainShiftX + (p.rawSliderX - p.cdGainShiftX) * 0.88;
+      } else {
+        p.currentX = p.rawSliderX;
+      }
+
+      if (handleRef.current) {
+        handleRef.current.style.transform = `translateX(${p.rawSliderX - 18}px)`;
+      }
+      if (progressFillRef.current) {
+        progressFillRef.current.style.width = `${p.rawSliderX + 16}px`;
+      }
+
+      // Smooth synthetic trajectory with minimal jitter (fails Craik's law + wrist coupling)
+      p.pointerLog.push({ x: p.rawSliderX, y: 80 + Math.sin(step * 0.25) * 0.3, t: performance.now() });
+
+      if (step === 30) {
+        setPhaseSync('HOLDING_SLOT');
+        p.slotEnterTime = performance.now();
+      } else if (step >= 55) {
+        clearInterval(botInterval);
+
+        const now = performance.now();
+        const dist = Math.abs(p.currentX - p.targetX);
+
+        // Synthetic telemetry packet representing the AI attempt
+        const botTelemetry = {
+          alignErrorPx: dist.toFixed(1) + ' px',
+          releaseLagMs: '190 ms',
+          reactionMs: 190, // spoofed reflex
+          slotErrorPx: Number(dist.toFixed(1)),
+          ballisticPeaks: 1, // fails Craik's law
+          wristCoupling: 0.012, // fails wrist coupling
+          submovementRateHz: 1.1, // fails submovement rate
+          meanVelocity: 0.42,
+          maxVelocity: 1.1,
+          velocitySkewness: 0.18,
+          harrisWolpertRatio: 1.15,
+          jerkZeroCrossings: 0.14,
+          windCrossCorrLagMs: 185,
+          holdDurationMs: Math.round(now - p.slotEnterTime),
+          sampleCount: p.pointerLog.length,
+          pointerLog: [...p.pointerLog],
+          perturbations: [],
+          isBot: true,
+          verified: false,
+        };
+
+        // Query the Node.js ML Inference Gate
+        try {
+          const res = await fetch('http://localhost:4000/api/telemetry/score-ml', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(botTelemetry),
+          });
+          if (res.ok) {
+            const mlResult = await res.json();
+            botTelemetry.mlScore = mlResult.mlScore;
+            botTelemetry.aiReplaceabilityRisk = mlResult.aiReplaceabilityRisk;
+            setFailReason(`Trained ML Classifier Blocked AI Agent! ${mlResult.reason} (ML Score: ${mlResult.mlScore} | AI Replaceability Risk: ${mlResult.aiReplaceabilityRisk})`);
+          } else {
+            setFailReason('Trained ML Classifier Blocked AI Agent! Lacks Craik ballistic submovements (f_sub=1.1Hz < 1.8Hz) & 2D wrist coupling.');
+          }
+        } catch {
+          setFailReason('Trained ML Classifier Blocked AI Agent! Lacks Craik ballistic submovements (f_sub=1.1Hz < 1.8Hz) & 2D wrist coupling.');
+        }
+
+        setTelemetry(botTelemetry);
+        soundEffects.playFail();
+        setPhaseSync('FAILED');
+        if (onVerified) onVerified(botTelemetry);
+        if (onAttempt) onAttempt(botTelemetry);
+      }
+    }, 20);
+  };
+
   return (
     <div className="max-w-md w-full mx-auto p-5 bg-slate-950 text-slate-100 rounded-2xl border border-slate-800 shadow-2xl font-sans select-none">
       {/* Header */}
@@ -695,15 +788,32 @@ export default function JigsawHoldVerify({
         </div>
       )}
 
-      {/* Red-Team Bot Simulator Footer */}
-      <div className="mt-4 pt-3 border-t border-slate-800 flex justify-between items-center text-xs">
-        <span className="text-slate-400">Test standard Discord/GeeTest Slider Bot:</span>
-        <button
-          onClick={runWindMouseBot}
-          className="bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800 px-3 py-1 rounded-lg font-semibold transition"
-        >
-          🤖 Run OpenCV + WindMouse Bot
-        </button>
+      {/* Red-Team & Trained ML Simulator Footer */}
+      <div className="mt-4 pt-3 border-t border-slate-800 space-y-2 text-xs">
+        <div className="flex items-center justify-between text-slate-400">
+          <span className="font-semibold text-slate-300">Red-Team AI Testing:</span>
+          <span className="text-[10px] text-slate-500">Benchmark defenses against automated bots</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={runWindMouseBot}
+            className="w-full bg-rose-950/70 hover:bg-rose-900 border border-rose-800/80 text-rose-300 p-2 rounded-xl font-bold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 text-[11px]"
+            title="Runs OpenCV Canny edge detector & open-loop WindMouse bot (fails C/D gain)"
+          >
+            <span>🤖</span>
+            <span>OpenCV + WindMouse</span>
+          </button>
+
+          <button
+            onClick={runTrainedMLBot}
+            className="w-full bg-indigo-950/70 hover:bg-indigo-900 border border-indigo-700/80 text-indigo-300 p-2 rounded-xl font-bold transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 text-[11px]"
+            title="Runs adaptive AI agent evaluated by the trained ML Random Forest & Mahalanobis model"
+          >
+            <span>🧠</span>
+            <span>Test Trained ML Bot</span>
+          </button>
+        </div>
       </div>
     </div>
   );
