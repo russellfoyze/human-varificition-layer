@@ -37,6 +37,8 @@ export default function JigsawHoldVerify({ onVerified }) {
 
   const canvasRef = useRef(null);
   const phaseRef = useRef('IDLE');
+  const handleRef = useRef(null);
+  const progressFillRef = useRef(null);
 
   // Puzzle geometry & closed-loop physics refs
   const puzzleRef = useRef({
@@ -75,6 +77,13 @@ export default function JigsawHoldVerify({ onVerified }) {
     setFailReason('');
     setTelemetry(null);
     setPhaseSync('IDLE');
+
+    if (handleRef.current) {
+      handleRef.current.style.transform = 'translateX(0px)';
+    }
+    if (progressFillRef.current) {
+      progressFillRef.current.style.width = '38px';
+    }
   }, []);
 
   useEffect(() => {
@@ -262,6 +271,13 @@ export default function JigsawHoldVerify({ onVerified }) {
     const rawX = Math.max(18, Math.min(295, e.clientX - p.dragStartX));
     p.rawSliderX = rawX;
 
+    if (handleRef.current) {
+      handleRef.current.style.transform = `translateX(${rawX - 18}px)`;
+    }
+    if (progressFillRef.current) {
+      progressFillRef.current.style.width = `${rawX + 16}px`;
+    }
+
     // Non-Linear Control-Display (C/D) Gain above 110px (defeats open-loop WindMouse bots)
     let mappedX = rawX;
     if (rawX > p.cdGainShiftX) {
@@ -395,6 +411,13 @@ export default function JigsawHoldVerify({ onVerified }) {
         p.currentX = p.rawSliderX;
       }
 
+      if (handleRef.current) {
+        handleRef.current.style.transform = `translateX(${p.rawSliderX - 18}px)`;
+      }
+      if (progressFillRef.current) {
+        progressFillRef.current.style.width = `${p.rawSliderX + 16}px`;
+      }
+
       // Log synthetic 1D coordinates (strictly flat Y = 80, constant speed)
       p.pointerLog.push({ x: p.rawSliderX, y: 80, t: performance.now() });
 
@@ -447,12 +470,13 @@ export default function JigsawHoldVerify({ onVerified }) {
       </div>
 
       {/* Interactive Discord-Style Slider Track */}
-      <div className="relative h-12 bg-slate-900 rounded-xl border border-slate-800 flex items-center px-2 overflow-hidden">
+      <div className="relative h-12 bg-slate-900/95 rounded-xl border border-slate-800 overflow-hidden shadow-inner">
         {/* Progress Fill */}
         <div
-          className="absolute left-0 top-0 bottom-0 transition-colors duration-150 pointer-events-none"
+          ref={progressFillRef}
+          className="absolute left-0 top-0 bottom-0 pointer-events-none transition-colors duration-150"
           style={{
-            width: `${puzzleRef.current.rawSliderX + 28}px`,
+            width: '38px',
             backgroundColor:
               phase === 'READY_RELEASE' || phase === 'VERIFIED'
                 ? 'rgba(16, 185, 129, 0.25)'
@@ -462,7 +486,8 @@ export default function JigsawHoldVerify({ onVerified }) {
           }}
         />
 
-        <div className="w-full text-center text-xs font-medium text-slate-400 pointer-events-none z-0">
+        {/* Centered Guide Label */}
+        <div className="absolute inset-0 flex items-center justify-center text-xs font-medium text-slate-400 pointer-events-none select-none z-0 px-12 text-center">
           {phase === 'IDLE' && 'Slide jigsaw piece into slot & hold →'}
           {phase === 'DRAGGING' && 'Align piece with the glowing slot...'}
           {phase === 'HOLDING_SLOT' && `Hold steady inside slot (${holdProgress}%)...`}
@@ -471,13 +496,14 @@ export default function JigsawHoldVerify({ onVerified }) {
           {phase === 'FAILED' && '✗ Verification Failed — Click Reset'}
         </div>
 
-        {/* Draggable Handle */}
+        {/* Draggable Handle - starts firmly at the beginning on the left */}
         <div
+          ref={handleRef}
           onPointerDown={handleSliderDown}
           onPointerMove={handleSliderMove}
           onPointerUp={handleSliderUp}
-          style={{ transform: `translateX(${puzzleRef.current.rawSliderX - 18}px)` }}
-          className={`relative z-10 w-12 h-9 rounded-lg flex items-center justify-center font-bold text-sm cursor-grab active:cursor-grabbing shadow-lg transition-colors touch-none ${
+          style={{ transform: 'translateX(0px)' }}
+          className={`absolute top-1.5 left-1.5 z-10 w-11 h-9 rounded-lg flex items-center justify-center font-bold text-sm cursor-grab active:cursor-grabbing shadow-lg transition-colors touch-none ${
             phase === 'READY_RELEASE' || phase === 'VERIFIED'
               ? 'bg-emerald-500 text-slate-950'
               : phase === 'HOLDING_SLOT'
