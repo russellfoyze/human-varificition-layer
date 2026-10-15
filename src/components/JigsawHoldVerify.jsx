@@ -28,7 +28,7 @@ function drawJigsawPath(ctx, x, y, size, tabSize = 11) {
   ctx.closePath();
 }
 
-export default function JigsawHoldVerify({ onVerified }) {
+export default function JigsawHoldVerify({ onVerified, onAttempt }) {
   // States: IDLE | DRAGGING | HOLDING_SLOT | READY_RELEASE | VERIFIED | FAILED
   const [phase, setPhase] = useState('IDLE');
   const [failReason, setFailReason] = useState('');
@@ -307,19 +307,41 @@ export default function JigsawHoldVerify({ onVerified }) {
     const finalDist = Math.abs(p.currentX + p.magneticDriftX - p.targetX);
 
     if (mode === 'DRAGGING') {
-      setFailReason(
-        `Jigsaw piece not locked! Stopped ${ Math.round(finalDist) }px away from cutout. Slide into the slot and HOLD.`
-      );
+      const reason = `Jigsaw piece not locked! Stopped ${Math.round(finalDist)}px away from cutout. Slide into the slot and HOLD.`;
+      setFailReason(reason);
       setPhaseSync('FAILED');
+      if (onAttempt) {
+        onAttempt({
+          verified: false,
+          reason,
+          isBot: p.isBotSim,
+          slotErrorPx: Math.round(finalDist),
+          reactionMs: 0,
+          sampleCount: p.pointerLog.length,
+          pointerLog: [...p.pointerLog],
+          perturbations: [...p.perturbations],
+        });
+      }
       return;
     }
 
     if (mode === 'HOLDING_SLOT') {
       const earlyMs = Math.round(p.releaseCueTime - now);
-      setFailReason(
-        `Released ${earlyMs}ms too early! Keep holding inside the jigsaw slot until it flashes GREEN.`
-      );
+      const reason = `Released ${earlyMs}ms too early! Keep holding inside the jigsaw slot until it flashes GREEN.`;
+      setFailReason(reason);
       setPhaseSync('FAILED');
+      if (onAttempt) {
+        onAttempt({
+          verified: false,
+          reason,
+          isBot: p.isBotSim,
+          slotErrorPx: Math.round(finalDist),
+          reactionMs: 0,
+          sampleCount: p.pointerLog.length,
+          pointerLog: [...p.pointerLog],
+          perturbations: [...p.perturbations],
+        });
+      }
       return;
     }
 
@@ -328,10 +350,21 @@ export default function JigsawHoldVerify({ onVerified }) {
 
       // Invariant 1: Optic-nerve latency floor (< 115ms is a DOM/pixel bot)
       if (reactionMs < 115) {
-        setFailReason(
-          `Bot Blocked: ${reactionMs}ms release is faster than human optic-motor latency (115ms min).`
-        );
+        const reason = `Bot Blocked: ${reactionMs}ms release is faster than human optic-motor latency (115ms min).`;
+        setFailReason(reason);
         setPhaseSync('FAILED');
+        if (onAttempt) {
+          onAttempt({
+            verified: false,
+            reason,
+            isBot: p.isBotSim,
+            reactionMs,
+            slotErrorPx: Number(finalDist.toFixed(1)),
+            sampleCount: p.pointerLog.length,
+            pointerLog: [...p.pointerLog],
+            perturbations: [...p.perturbations],
+          });
+        }
         return;
       }
 
@@ -355,15 +388,29 @@ export default function JigsawHoldVerify({ onVerified }) {
         }
       }
 
+      const meanVel = speeds.length ? speeds.reduce((a, b) => a + b, 0) / speeds.length : 0;
+      const maxVel = speeds.length ? Math.max(...speeds) : 0;
+      const wristScore = Number((yVariance / Math.max(1, pts.length) + 0.042).toFixed(3));
+      const durSec = (pts[pts.length - 1].t - pts[0].t) / 1000;
+      const subRate = Number((velocityPeaks / Math.max(0.5, durSec)).toFixed(2));
+
       if (p.isBotSim) {
         const botTelemetry = {
           alignErrorPx: finalDist.toFixed(1) + ' px',
           releaseLagMs: reactionMs + ' ms',
-          ballisticPeaks: '0 sub-moves',
-          wristCoupling: '0.001 (Linear)',
+          reactionMs,
+          slotErrorPx: Number(finalDist.toFixed(1)),
+          ballisticPeaks: 0,
+          wristCoupling: 0.001,
+          submovementRateHz: 0,
+          meanVelocity: Number(meanVel.toFixed(2)),
+          maxVelocity: Number(maxVel.toFixed(2)),
+          holdDurationMs: Math.round(now - p.slotEnterTime),
+          sampleCount: pts.length,
           pointerLog: [...pts],
           perturbations: [...p.perturbations],
           isBot: true,
+          verified: false,
         };
         setTelemetry(botTelemetry);
         setFailReason(
@@ -371,21 +418,31 @@ export default function JigsawHoldVerify({ onVerified }) {
         );
         setPhaseSync('FAILED');
         if (onVerified) onVerified(botTelemetry);
+        if (onAttempt) onAttempt(botTelemetry);
         return;
       }
 
       const successTelemetry = {
         alignErrorPx: finalDist.toFixed(1) + ' px',
         releaseLagMs: reactionMs + ' ms',
-        ballisticPeaks: velocityPeaks + ' sub-moves',
-        wristCoupling: (yVariance / Math.max(1, pts.length) + 0.042).toFixed(3),
+        reactionMs,
+        slotErrorPx: Number(finalDist.toFixed(1)),
+        ballisticPeaks: velocityPeaks,
+        wristCoupling: wristScore,
+        submovementRateHz: subRate,
+        meanVelocity: Number(meanVel.toFixed(2)),
+        maxVelocity: Number(maxVel.toFixed(2)),
+        holdDurationMs: Math.round(now - p.slotEnterTime),
+        sampleCount: pts.length,
         pointerLog: [...pts],
         perturbations: [...p.perturbations],
         isBot: false,
+        verified: true,
       };
       setTelemetry(successTelemetry);
       setPhaseSync('VERIFIED');
       if (onVerified) onVerified(successTelemetry);
+      if (onAttempt) onAttempt(successTelemetry);
     }
   };
 
@@ -548,6 +605,12 @@ export default function JigsawHoldVerify({ onVerified }) {
               <div className="font-mono font-bold text-indigo-300">{telemetry.wristCoupling}</div>
             </div>
           </div>
+          <button
+            onClick={initChallenge}
+            className="w-full mt-2.5 py-2 bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-500 hover:from-emerald-500 hover:to-teal-400 text-slate-950 font-bold rounded-xl text-xs shadow-lg shadow-emerald-500/20 transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.99]"
+          >
+            🎮 Next Puzzle Round →
+          </button>
         </div>
       )}
 

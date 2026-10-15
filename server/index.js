@@ -3,6 +3,13 @@ import http from 'http';
 import { WebSocketServer } from 'ws';
 import { signVerificationToken, verifyVerificationToken, HMAC_SECRET } from './cryptoToken.js';
 import { verifyClosedLoopBiomechanics } from './closedLoopScorer.js';
+import {
+  recordSample,
+  getDataset,
+  getDatasetStats,
+  exportToCSV,
+  clearDataset,
+} from './datasetStore.js';
 
 const app = express();
 app.use(express.json());
@@ -73,6 +80,35 @@ app.post('/api/verify-closed-loop', (req, res) => {
     metrics: scoreResult.metrics,
     token,
   });
+});
+
+// REST ML Telemetry Dataset Collection Endpoints
+app.post('/api/telemetry/record', (req, res) => {
+  const sample = req.body;
+  if (!sample) {
+    return res.status(400).json({ error: 'Sample body required' });
+  }
+  const saved = recordSample(sample);
+  const stats = getDatasetStats();
+  return res.json({ success: true, saved, stats });
+});
+
+app.get('/api/telemetry/dataset', (req, res) => {
+  const dataset = getDataset();
+  const stats = getDatasetStats();
+  return res.json({ dataset, stats });
+});
+
+app.get('/api/telemetry/export-csv', (req, res) => {
+  const csv = exportToCSV();
+  res.header('Content-Type', 'text/csv');
+  res.attachment(`antigravity_ml_dataset_${Date.now()}.csv`);
+  return res.send(csv);
+});
+
+app.delete('/api/telemetry/clear', (req, res) => {
+  clearDataset();
+  return res.json({ success: true, message: 'Dataset cleared' });
 });
 
 const server = http.createServer(app);

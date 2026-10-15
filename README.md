@@ -96,20 +96,24 @@ c:/Users/russe/Desktop/human test3/
 ├── src/
 │   ├── main.jsx                 # React root mount
 │   ├── index.css                # Global Tailwind styles
-│   ├── App.jsx                  # Main view rendering JigsawHoldVerify
+│   ├── App.jsx                  # Main view with Game Arena & ML Dashboard tabs
 │   ├── components/
-│   │   └── JigsawHoldVerify.jsx # Self-contained Jigsaw Slide + Magnetic Hold Component
+│   │   ├── JigsawHoldVerify.jsx # Self-contained Jigsaw Slide + Magnetic Hold Component
+│   │   ├── BiomechanicalGraphs.jsx # 4 Real-time Sensorimotor Telemetry Graphs
+│   │   └── MLDatasetDashboard.jsx # ML Training Dataset Explorer & Exporter
 │   └── utils/
 │       └── closedLoopScorer.js  # 4 Biomechanical Invariants verification engine
 │
 ├── server/
 │   ├── index.js                 # Express + WebSocket Authoritative Backend Server
 │   ├── cryptoToken.js           # HMAC-SHA256 Zero-Trust Verification Token Signer
-│   └── closedLoopScorer.js      # Backend re-export for REST endpoint verification
+│   ├── closedLoopScorer.js      # Backend re-export for REST endpoint verification
+│   └── datasetStore.js         # Persistent ML Training Dataset Store (CSV & JSON)
 │
 └── tests/
     ├── jigsawHoldVerify.test.js # C/D gain, early release, and optic latency tests
     ├── closedLoopScorer.test.js # 4 Biomechanical Invariants (Craik, Harris-Wolpert) tests
+    ├── datasetStore.test.js     # ML dataset recording, stats, and CSV export tests
     ├── cryptoToken.test.js      # HMAC-SHA256 signature, tampering, and expiry tests
     └── server.test.js           # WebSocket round-trip protocol & REST API tests
 ```
