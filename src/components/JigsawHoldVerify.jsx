@@ -41,6 +41,7 @@ export default function JigsawHoldVerify({
   const [failReason, setFailReason] = useState('');
   const [telemetry, setTelemetry] = useState(null);
   const [holdProgress, setHoldProgress] = useState(0);
+  const [showBotGuide, setShowBotGuide] = useState(false);
 
   const canvasRef = useRef(null);
   const phaseRef = useRef('IDLE');
@@ -791,9 +792,67 @@ export default function JigsawHoldVerify({
       {/* Red-Team & Trained ML Simulator Footer */}
       <div className="mt-4 pt-3 border-t border-slate-800 space-y-2 text-xs">
         <div className="flex items-center justify-between text-slate-400">
-          <span className="font-semibold text-slate-300">Red-Team AI Testing:</span>
+          <div className="flex items-center gap-1.5">
+            <span className="font-semibold text-slate-300">Red-Team AI Testing:</span>
+            <button
+              onClick={() => setShowBotGuide(!showBotGuide)}
+              className="text-[10px] text-cyan-400 hover:text-cyan-300 bg-cyan-950/60 hover:bg-cyan-900/60 border border-cyan-800/60 px-2 py-0.5 rounded-md flex items-center gap-1 transition cursor-pointer"
+            >
+              <span>ℹ️</span>
+              <span>{showBotGuide ? 'Hide Guide' : 'How It Works'}</span>
+            </button>
+          </div>
           <span className="text-[10px] text-slate-500">Benchmark defenses against automated bots</span>
         </div>
+
+        {/* Expandable Bot Test Guide Panel */}
+        {showBotGuide && (
+          <div className="p-3 bg-slate-900/90 rounded-xl border border-indigo-800/60 text-slate-300 text-[11px] space-y-2.5 animate-in fade-in duration-150">
+            <div className="flex items-center justify-between font-bold text-indigo-300 border-b border-indigo-900/60 pb-1.5">
+              <span className="flex items-center gap-1.5">
+                <span>🧠</span>
+                <span>Trained ML Red-Team Bot Architecture &amp; Guide</span>
+              </span>
+              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-700/60">
+                v6.0-AUDIT
+              </span>
+            </div>
+
+            <div className="space-y-1.5 text-slate-300/90 leading-relaxed">
+              <p>
+                <strong className="text-white">1. Purpose:</strong> Tests whether an intelligent bot armed with computer vision and gain compensation can spoof this human verification.
+              </p>
+              <p>
+                <strong className="text-white">2. Simulated Execution:</strong>
+              </p>
+              <ul className="list-disc pl-4 space-y-1 text-slate-400">
+                <li><span className="text-slate-200">Vision &amp; Target Acquisition:</span> Accurately locates target cutout coordinates.</li>
+                <li><span className="text-slate-200">C/D Gain Inversion:</span> Solves the non-linear 0.88x control/display gain shift that breaks standard macros.</li>
+                <li><span className="text-slate-200">Reflex Spoofing:</span> Simulates a swift 190ms reaction time inside human bounds.</li>
+              </ul>
+              <p>
+                <strong className="text-white">3. Why the Trained ML Model Blocks It:</strong>
+              </p>
+              <div className="grid grid-cols-2 gap-1.5 font-mono text-[10px]">
+                <div className="bg-slate-950 p-1.5 rounded border border-rose-900/50 text-rose-300">
+                  ✗ Craik Pulses: 1.1Hz (&ge;1.8Hz req)
+                </div>
+                <div className="bg-slate-950 p-1.5 rounded border border-rose-900/50 text-rose-300">
+                  ✗ Wrist Arc: 0.012 (Too 1D linear)
+                </div>
+                <div className="bg-slate-950 p-1.5 rounded border border-rose-900/50 text-rose-300">
+                  ✗ Jerk Zero-Crossings: 0.14
+                </div>
+                <div className="bg-slate-950 p-1.5 rounded border border-rose-900/50 text-rose-300">
+                  ✗ HW Noise: 1.15 (Synthetic)
+                </div>
+              </div>
+              <p className="text-[10px] text-slate-400 pt-1 border-t border-slate-800">
+                <strong className="text-emerald-400">Real-Time Evaluation:</strong> Evaluated live via <code className="text-indigo-300 font-mono">POST /api/telemetry/score-ml</code> using Random Forest + Mahalanobis distance in Node.js.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-2">
           <button
