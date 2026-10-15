@@ -16,6 +16,7 @@
 - [Mathematical & Biomechanical Defense Principles](#-mathematical--biomechanical-defense-principles)
 - [Defensive Resistance Matrix](#-defensive-resistance-matrix)
 - [System Architecture & File Structure](#-system-architecture--file-structure)
+- [Data Structures & Algorithms Specification](DATA_STRUCTURES_AND_ALGORITHMS.md)
 - [Getting Started & Quickstart](#-getting-started--quickstart)
 - [Backend REST & WebSocket API Reference](#-backend-rest--websocket-api-reference)
 - [Automated Verification & Test Suite](#-automated-verification--test-suite)
@@ -92,6 +93,7 @@ c:/Users/russe/Desktop/human test3/
 ├── postcss.config.js            # PostCSS configuration with Tailwind & Autoprefixer
 ├── index.html                   # HTML5 application root entry
 ├── README.md                    # System documentation and operational manual
+├── DATA_STRUCTURES_AND_ALGORITHMS.md # Complete algorithmic & data structural specification
 │
 ├── src/
 │   ├── main.jsx                 # React root mount
