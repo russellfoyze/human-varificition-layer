@@ -304,8 +304,17 @@ export default function App() {
 
   // Starting Security Gate Handlers
   const handleGateVerified = (telemetryData) => {
+    // STRICT ZERO-TRUST SECURITY: Under NO circumstances can a bot unlock the application
+    if (!telemetryData || !telemetryData.verified || telemetryData.isBot) {
+      setSecurityError('AI / Bot Simulation detected. Only verified biological humans can unlock the application.');
+      setIsUnlocked(false);
+      setUnlockAnimation(false);
+      return;
+    }
+
     setLatestTelemetry(telemetryData);
     setUnlockAnimation(true);
+    setSecurityError('');
     soundEffects.playLevelUp();
 
     const token = telemetryData.token;
@@ -326,8 +335,10 @@ export default function App() {
 
   const handleGateAttempt = async (attemptData) => {
     await handleAttempt(attemptData);
-    if (!attemptData.verified) {
-      setSecurityError(attemptData.reason || 'Verification blocked. Human authentication required.');
+    if (!attemptData.verified || attemptData.isBot) {
+      setIsUnlocked(false);
+      setUnlockAnimation(false);
+      setSecurityError(attemptData.reason || (attemptData.isBot ? 'Bot Blocked: Automated AI cannot unlock this application.' : 'Verification interrupted. Human authentication required.'));
     }
   };
 
@@ -501,8 +512,10 @@ export default function App() {
                   lastReward={lastReward}
                   isGateMode={true}
                   onUnlockApp={() => {
-                    setIsUnlocked(true);
-                    setUnlockAnimation(false);
+                    if (latestTelemetry && latestTelemetry.verified && !latestTelemetry.isBot) {
+                      setIsUnlocked(true);
+                      setUnlockAnimation(false);
+                    }
                   }}
                 />
               </div>
@@ -510,7 +523,7 @@ export default function App() {
 
             {/* Verification Status & Security Invariant Specs */}
             <div className="w-full bg-slate-950/80 border border-slate-800/80 rounded-2xl p-3.5 space-y-2 text-xs backdrop-blur-md shadow-xl">
-              {unlockAnimation || (latestTelemetry && latestTelemetry.verified) ? (
+              {unlockAnimation || (latestTelemetry && latestTelemetry.verified && !latestTelemetry.isBot) ? (
                 <div className="space-y-2 py-1 text-center animate-in fade-in">
                   <div className="flex items-center justify-center gap-2 text-emerald-400 font-black text-xs animate-pulse">
                     <span>🔓</span>
@@ -518,8 +531,10 @@ export default function App() {
                   </div>
                   <button
                     onClick={() => {
-                      setIsUnlocked(true);
-                      setUnlockAnimation(false);
+                      if (latestTelemetry && latestTelemetry.verified && !latestTelemetry.isBot) {
+                        setIsUnlocked(true);
+                        setUnlockAnimation(false);
+                      }
                     }}
                     className="w-full py-2.5 bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 text-slate-950 font-black rounded-xl text-xs shadow-lg shadow-emerald-500/30 transition flex items-center justify-center gap-2 cursor-pointer active:scale-95 animate-bounce"
                   >

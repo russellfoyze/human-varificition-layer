@@ -438,7 +438,6 @@ export default function JigsawHoldVerify({
         );
         soundEffects.playFail();
         setPhaseSync('FAILED');
-        if (onVerified) onVerified(botTelemetry);
         if (onAttempt) onAttempt(botTelemetry);
         return;
       }
@@ -624,7 +623,6 @@ export default function JigsawHoldVerify({
         setTelemetry(botTelemetry);
         soundEffects.playFail();
         setPhaseSync('FAILED');
-        if (onVerified) onVerified(botTelemetry);
         if (onAttempt) onAttempt(botTelemetry);
       }
     }, 20);
