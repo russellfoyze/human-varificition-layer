@@ -126,6 +126,15 @@ app.post('/api/telemetry/score-ml', (req, res) => {
     return res.status(400).json({ error: 'Telemetry data required' });
   }
   const scoreResult = scoreLiveTelemetryWithML(telemetry);
+  if (scoreResult.verified && !telemetry.isBot) {
+    scoreResult.token = signVerificationToken({
+      iat: Date.now(),
+      exp: Date.now() + 15 * 60 * 1000,
+      verified: true,
+      mlScore: scoreResult.mlScore,
+      aiReplaceabilityRisk: scoreResult.aiReplaceabilityRisk,
+    });
+  }
   return res.json(scoreResult);
 });
 

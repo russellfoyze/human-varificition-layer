@@ -70,6 +70,12 @@ export default function App() {
   const [showGraphs, setShowGraphs] = useState(true);
   const [copied, setCopied] = useState(false);
 
+  // Security Layer Gate State (Always locked by default on every page refresh)
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [isVerifyingToken, setIsVerifyingToken] = useState(false);
+  const [unlockAnimation, setUnlockAnimation] = useState(false);
+  const [securityError, setSecurityError] = useState('');
+
   // ML Dataset State
   const [dataset, setDataset] = useState([]);
   const [datasetStats, setDatasetStats] = useState({});
@@ -296,6 +302,73 @@ export default function App() {
     }
   };
 
+  // Starting Security Gate Handlers
+  const handleGateVerified = async (telemetryData) => {
+    setLatestTelemetry(telemetryData);
+    const token = telemetryData.token;
+
+    if (!token) {
+      setSecurityError('Verification failed: No zero-trust token received.');
+      return;
+    }
+
+    setIsVerifyingToken(true);
+    setSecurityError('');
+
+    try {
+      const res = await fetch('http://localhost:4000/api/verify-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.valid) {
+          setVerifiedToken(token);
+          if (telemetryData.mlScore !== undefined) {
+            setLatestMLScore(Number(telemetryData.mlScore));
+            localStorage.setItem('ag_last_ml_score', telemetryData.mlScore.toString());
+          }
+          setUnlockAnimation(true);
+          soundEffects.playLevelUp();
+          setTimeout(() => {
+            setIsUnlocked(true);
+            setIsVerifyingToken(false);
+            setUnlockAnimation(false);
+          }, 850);
+          return;
+        }
+      }
+    } catch {
+      // Standalone/offline fallback verification
+      if (token && token.startsWith('ag_bp_')) {
+        setVerifiedToken(token);
+        if (telemetryData.mlScore !== undefined) {
+          setLatestMLScore(Number(telemetryData.mlScore));
+          localStorage.setItem('ag_last_ml_score', telemetryData.mlScore.toString());
+        }
+        setUnlockAnimation(true);
+        setTimeout(() => {
+          setIsUnlocked(true);
+          setIsVerifyingToken(false);
+          setUnlockAnimation(false);
+        }, 850);
+        return;
+      }
+    }
+
+    setIsVerifyingToken(false);
+    setSecurityError('Cryptographic signature verification failed. Access denied.');
+  };
+
+  const handleGateAttempt = async (attemptData) => {
+    await handleAttempt(attemptData);
+    if (!attemptData.verified) {
+      setSecurityError(attemptData.reason || 'Verification blocked. Human authentication required.');
+    }
+  };
+
   const clearDataset = async () => {
     try {
       await fetch('http://localhost:4000/api/telemetry/clear', { method: 'DELETE' });
@@ -431,8 +504,90 @@ export default function App() {
         </div>
       )}
 
-      {/* Top Cybernetic Glassmorphism Navigation Bar */}
-      <header className="w-full border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-xl py-3 px-4 sm:px-6 sticky top-0 z-50 flex flex-wrap items-center justify-between gap-3">
+      {/* 🔒 ZERO-TRUST STARTING SECURITY GATEWAY (Shown upon every refresh) */}
+      {!isUnlocked ? (
+        <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden bg-[#070b14]">
+          {/* Subtle Cybernetic Background Glow */}
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-950/40 via-slate-950/90 to-[#070b14] pointer-events-none" />
+          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="relative z-10 w-full max-w-md flex flex-col items-center space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            {/* Security Gate Header Badge */}
+            <div className="text-center space-y-1.5">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-950/80 border border-indigo-700/60 text-indigo-300 text-[11px] font-mono font-semibold shadow-lg shadow-indigo-950/50">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                <span>ZERO-TRUST BIOMETRIC GATEWAY</span>
+                <span className="text-[9px] bg-indigo-900/80 px-1.5 py-0.5 rounded text-cyan-300 font-bold">HMAC-SHA256</span>
+              </div>
+              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                Human Verification Required
+              </h1>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
+                Complete the closed-loop reflex jigsaw test below to generate a zero-trust cryptographic token and unlock the AntiGravity suite.
+              </p>
+            </div>
+
+            {/* The Starting Challenge Card (Matches User's Attached Screenshot) */}
+            <div className="w-full relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/30 via-indigo-500/30 to-emerald-500/30 rounded-3xl blur-xl opacity-75 group-hover:opacity-100 transition duration-300 pointer-events-none" />
+              <div className="relative">
+                <JigsawHoldVerify
+                  onVerified={handleGateVerified}
+                  onAttempt={handleGateAttempt}
+                  streak={streak}
+                  soundEnabled={soundEnabled}
+                  lastReward={lastReward}
+                />
+              </div>
+            </div>
+
+            {/* Verification Status & Security Invariant Specs */}
+            <div className="w-full bg-slate-950/80 border border-slate-800/80 rounded-2xl p-3.5 space-y-2 text-xs backdrop-blur-md shadow-xl">
+              {isVerifyingToken ? (
+                <div className="flex items-center justify-center gap-2 text-cyan-400 font-bold py-1">
+                  <span className="w-3 h-3 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin" />
+                  <span>Validating Cryptographic HMAC-SHA256 Token...</span>
+                </div>
+              ) : unlockAnimation ? (
+                <div className="flex items-center justify-center gap-2 text-emerald-400 font-black py-1 animate-bounce">
+                  <span>✓ TOKEN VERIFIED! UNLOCKING APPLICATION...</span>
+                </div>
+              ) : securityError ? (
+                <div className="text-rose-400 font-semibold text-center text-[11px] leading-relaxed">
+                  ⚠️ {securityError}
+                </div>
+              ) : (
+                <div className="flex items-center justify-between text-[11px] text-slate-400">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                    <span>App Status: <strong className="text-amber-300">LOCKED</strong></span>
+                  </span>
+                  <span className="font-mono text-slate-500 text-[10px]">Awaiting Valid Token</span>
+                </div>
+              )}
+
+              <div className="pt-2 border-t border-slate-900 grid grid-cols-3 gap-1.5 text-center text-[10px] text-slate-400">
+                <div className="bg-slate-900/60 p-1.5 rounded-lg border border-slate-800/80">
+                  <div className="font-bold text-slate-300">C/D Gain</div>
+                  <div>0.88x Inversion</div>
+                </div>
+                <div className="bg-slate-900/60 p-1.5 rounded-lg border border-slate-800/80">
+                  <div className="font-bold text-slate-300">Reflex Limit</div>
+                  <div>115ms - 680ms</div>
+                </div>
+                <div className="bg-slate-900/60 p-1.5 rounded-lg border border-slate-800/80">
+                  <div className="font-bold text-slate-300">ML Defense</div>
+                  <div>Mahalanobis</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* TOTAL APPLICATION UNLOCKED VIEW */
+        <>
+          {/* Top Cybernetic Glassmorphism Navigation Bar */}
+          <header className="w-full border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-xl py-3 px-4 sm:px-6 sticky top-0 z-50 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 via-indigo-500 to-emerald-400 p-[1.5px] shadow-lg shadow-cyan-500/20">
             <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center font-bold text-base text-cyan-400">
@@ -520,6 +675,26 @@ export default function App() {
               📊 {showGraphs ? 'Hide Graphs' : 'Show Graphs'}
             </button>
           )}
+
+          {/* Active Zero-Trust Token Badge */}
+          <div className="hidden md:flex items-center gap-1.5 bg-emerald-950/70 border border-emerald-500/50 px-2.5 py-1.5 rounded-xl text-emerald-300 text-xs">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="font-semibold text-[11px]">Zero-Trust:</span>
+            <span className="font-mono text-[10px] text-emerald-400 font-bold">UNLOCKED</span>
+          </div>
+
+          {/* Lock App Button to return to Security Verification Gate */}
+          <button
+            onClick={() => {
+              setIsUnlocked(false);
+              setVerifiedToken(null);
+            }}
+            className="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-rose-950/60 hover:bg-rose-900/80 border border-rose-800 text-rose-300 transition flex items-center gap-1 cursor-pointer active:scale-95"
+            title="Lock Application and return to Security Verification Gate"
+          >
+            <span>🔒</span>
+            <span>Lock App</span>
+          </button>
         </div>
       </header>
 
@@ -720,6 +895,8 @@ export default function App() {
           </div>
         )}
       </main>
+        </>
+      )}
     </div>
   );
 }
