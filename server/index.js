@@ -33,6 +33,9 @@ app.use((req, res, next) => {
   next();
 });
 
+// Serve docs statically (including the research PDF)
+app.use('/docs', express.static(path.join(__dirname, '../docs')));
+
 // REST Health Check
 app.get('/api/health', (req, res) => {
   res.json({
@@ -40,6 +43,18 @@ app.get('/api/health', (req, res) => {
     service: 'AntiGravity Bio-Pulse Verification Server',
     timestamp: new Date().toISOString(),
   });
+});
+
+// REST Endpoint to download research PDF
+app.get('/api/research-pdf', (req, res) => {
+  const pdfPath = path.join(__dirname, '../docs/AntiGravity_Sensorimotor_Biometric_Verification_Research.pdf');
+  if (fs.existsSync(pdfPath)) {
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="AntiGravity_Sensorimotor_Biometric_Verification_Research.pdf"');
+    fs.createReadStream(pdfPath).pipe(res);
+  } else {
+    res.status(404).json({ error: 'Research PDF not found' });
+  }
 });
 
 // REST Token Verification API
